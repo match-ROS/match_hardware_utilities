@@ -21,8 +21,12 @@ class KeyenceTransformNode():
 
         self.tcp_scanner_offset = [0.0,0.0,0.7364]
 
-        rospy.Subscriber("/mur620c/UR10_r/ur_calibrated_pose",PoseStamped, self.pose_cb)   
-        rospy.sleep(1)
+        self.ur_pose_topic = rospy.get_param("~ur_pose_topic", "/mur620c/UR10_r/ur_calibrated_pose")
+
+        rospy.Subscriber(self.ur_pose_topic,PoseStamped, self.pose_cb) 
+        rospy.loginfo("waiting for pose message")
+        rospy.wait_for_message(self.ur_pose_topic,PoseStamped)
+        
         rospy.Subscriber("/profiles",PointCloud2, self.pointcloud_cb)   
         self.cloud_pub = rospy.Publisher("/cloud_out",PointCloud2, queue_size = 10)
         self.cloud_out = PointCloud2()

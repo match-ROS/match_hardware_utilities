@@ -5,8 +5,8 @@
   <node pkg="tf2_ros" type="static_transform_publisher" name="world_transform" args="0 0 0 0 0 0 map world" output="screen"/>
   <!-- <node pkg="rviz" type="rviz" name="rviz" args="-s '' -d $(find keyence_scanner)/config/v7200.rviz" output="screen" required="true"/> -->
 
-  <node pkg="keyence_scanner" type="keyence_transform_node.py" name="keyence_transform_node"  /> 
-  <node pkg="keyence_scanner" type="keyence_driver_node" name="keyence_driver_node" >
+  <node pkg="keyence_scanner" type="keyence_transform_node.py" name="keyence_transform_node" output="screen" /> 
+  <node pkg="keyence_scanner" type="keyence_driver_node" name="keyence_driver_node" output="screen" >
     <param name="controller_ip" value="192.168.12.88" />
   </node>
 
