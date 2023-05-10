@@ -14,9 +14,8 @@ class auswertung():
         self.poseArray = PoseArray() # Type: PoseArray
         self.pose = Pose()
         self.laser_projector = LaserProjection()
-        self.sub = rospy.Subscriber("cloud_out", PointCloud2, self.subcb)
+        self.sub = rospy.Subscriber("/profiles", PointCloud2, self.subcb)
         rospy.spin()
-        self.pub = rospy.Publisher('ranges', JointState, queue_size=10)
 
 
     def subcb(self,cloud):
