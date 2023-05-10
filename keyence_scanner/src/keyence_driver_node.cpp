@@ -299,9 +299,6 @@ int main(int argc, char** argv)
         // TODO: maybe we should actually always poll sensor, but just not
         //       publish anything (although unpacking + publishing is cheap)
 
-        ROS_INFO_THROTTLE(1, "Running");
-
-
         if (!active_flag)
         {
           ROS_INFO_THROTTLE(60, "Sensor is disabled via the 'activity flag'.");

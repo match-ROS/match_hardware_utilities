@@ -21,7 +21,6 @@ class auswertung():
     def subcb(self,cloud):
         #rospy.loginfo("Got scan, projecting")
         cloud_points = list(pc2.read_points(cloud, skip_nans=True, field_names = ("x", "y", "z")))
-        print("running")
         for i in range(1,len(cloud_points)):
             #print(i[2])
             self.pose.position.x = cloud_points[i][2]
