@@ -25,8 +25,7 @@ class auswertung():
         for i in range(1,len(cloud_points)):
             #print(i[2])
             self.pose.position.x = cloud_points[i][2]
-            if i == 400:
-                rospy.loginfo(self.pose.position.x)
+            rospy.loginfo(self.pose.position.x)
             
             #self.poseArray.append(self.pose)
 

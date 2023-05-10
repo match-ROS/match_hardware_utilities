@@ -19,7 +19,7 @@ class KeyenceTransformNode():
     def __init__(self):
         rospy.init_node('keyence_transform_node')
 
-        self.tcp_scanner_offset = [0.0,0.0,0.7364]
+        self.tcp_scanner_offset = [0.038,0.038,0.7364]
 
         self.ur_pose_topic = rospy.get_param("~ur_pose_topic", "/mur620c/UR10_r/ur_calibrated_pose")
 
@@ -50,13 +50,17 @@ class KeyenceTransformNode():
 
         R = tf_conversions.transformations.quaternion_matrix([data.pose.orientation.x,data.pose.orientation.y,data.pose.orientation.z,data.pose.orientation.w])
 
-        t.transform.translation.x = -data.pose.position.x
-        t.transform.translation.y = -data.pose.position.y
+        t.transform.translation.x = -data.pose.position.x + self.tcp_scanner_offset[0] * R[0,0] + self.tcp_scanner_offset[1] * R[0,1] 
+        t.transform.translation.y = -data.pose.position.y + self.tcp_scanner_offset[1] * R[1,1] + self.tcp_scanner_offset[2] * R[1,2]
         t.transform.translation.z = data.pose.position.z - self.tcp_scanner_offset[2]
         
         # the data is rotated by 180 degrees around the z axis
-        q = tf_conversions.transformations.quaternion_from_euler(math.pi,0,-math.pi/4)
-        q_transform = tf_conversions.transformations.quaternion_multiply(q,[data.pose.orientation.x,data.pose.orientation.y,data.pose.orientation.z,data.pose.orientation.w])
+        q = tf_conversions.transformations.quaternion_from_euler(math.pi,0,0.995-math.pi)
+        
+        # invert quaternion
+        q_inv = [data.pose.orientation.x,-data.pose.orientation.y,-data.pose.orientation.z,-data.pose.orientation.w]
+        
+        q_transform = tf_conversions.transformations.quaternion_multiply(q,q_inv)
         
         t.transform.rotation.x = q_transform[0]
         t.transform.rotation.y = q_transform[1]
