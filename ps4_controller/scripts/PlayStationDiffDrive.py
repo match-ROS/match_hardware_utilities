@@ -56,14 +56,8 @@ class PlayStationDiffDrive(PlayStationHandler):
                         pass
             
             if self.initialized == True:
-                if self._axes[6] != 0.0 or self._axes[7] != 0.0:
-                    self.v_x = self._axes[7] * self.speed_translation
-                    self.v_y = self._axes[6] * self.speed_translation
-                else:
-                    self.v_y = self._axes[7] * self.speed_translation
-                    self.v_x = self._axes[self.LS_V]*self.speed_translation
-                    self.v_y = self._axes[self.LS_H]*self.speed_translation
-                    self.rotation = (self._axes[self.RS_H])*self.speed_rotation
+                self.v_x = (1-self._axes[5]) * self.speed_translation - (1-self._axes[2]) * self.speed_translation
+                self.rotation = (self._axes[0])*self.speed_rotation + (self._axes[3])*self.speed_rotation
                 self.publishFunction()
             else:
                 rospy.loginfo_throttle(5,"Controller is not initialized. Press and release both shoulder buttons simultaneously")
