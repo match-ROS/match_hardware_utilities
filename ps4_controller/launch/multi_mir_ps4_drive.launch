@@ -1,7 +1,7 @@
 <launch>
     <!-- Launch the driver for the ps4 controller and publish data to "ps4_input" topic -->
     
-    <arg name="robot_names"  default='["virtual_leader",mur620a","mur620c","mur620d"]'/>
+    <arg name="robot_names"  default='["virtual_leader","mur620a","mur620c","mur620d"]'/>
     <arg name="cmd_vel_topic_prefix"  default=""/>
     <arg name="twist_stamped"  default="False"/>
     

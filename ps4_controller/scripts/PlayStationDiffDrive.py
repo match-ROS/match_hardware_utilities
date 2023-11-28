@@ -14,8 +14,8 @@ class PlayStationDiffDrive(PlayStationHandler):
                                 callbacks.increaseRot,
                                 callbacks.increaseTrans,
                                 callbacks.decreaseRot,
-                                callbacks.increaseActiveRobotID,
                                 callbacks.decreaseActiveRobotID,
+                                callbacks.increaseActiveRobotID,
                                 callbacks.dummy,
                                 callbacks.changeRobot
                                 ]
