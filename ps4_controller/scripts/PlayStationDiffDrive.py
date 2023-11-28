@@ -14,8 +14,8 @@ class PlayStationDiffDrive(PlayStationHandler):
                                 callbacks.increaseRot,
                                 callbacks.increaseTrans,
                                 callbacks.decreaseRot,
-                                callbacks.lowering,
-                                callbacks.lifting,
+                                callbacks.increaseActiveRobotID,
+                                callbacks.decreaseActiveRobotID,
                                 callbacks.dummy,
                                 callbacks.changeRobot
                                 ]
@@ -38,10 +38,10 @@ class PlayStationDiffDrive(PlayStationHandler):
         
         
         if self.robotnames == "":
-            self.publisher_stack.append(rospy.Publisher(self.cmd_vel_topic_prefix + "/cmd_vel",message_type,queue_size= 10))
+            self.publisher_stack.append(rospy.Publisher(self.cmd_vel_topic_prefix + "cmd_vel",message_type,queue_size= 10))
         else:
             for i in self.robotnames: 
-                    self.publisher_stack.append(rospy.Publisher(i+"/" + self.cmd_vel_topic_prefix + "/cmd_vel",message_type,queue_size= 10))
+                    self.publisher_stack.append(rospy.Publisher(i+"/" + self.cmd_vel_topic_prefix + "cmd_vel",message_type,queue_size= 10))
 
 
     def run(self):
@@ -54,13 +54,13 @@ class PlayStationDiffDrive(PlayStationHandler):
                     except Exception as ex:
                         print(ex)
                         pass
-            
+
             if self.initialized == True:
                 self.v_x = (1-self._axes[5]) * self.speed_translation - (1-self._axes[2]) * self.speed_translation
                 self.rotation = (self._axes[0])*self.speed_rotation + (self._axes[3])*self.speed_rotation
                 self.publishFunction()
             else:
-                rospy.loginfo_throttle(5,"Controller is not initialized. Press and release both shoulder buttons simultaneously")
+                rospy.loginfo_throttle(10,"Controller is not initialized. Press and release both shoulder buttons simultaneously")
                 if self._axes[2] == -1.0 and self._axes[5] == -1.0:
                     self.lower_position_reached = True
                     rospy.loginfo_once("lower position reached")

@@ -10,19 +10,15 @@ class Callbacks():
     def dummy(self):
         pass
 
-    def lifting(self):
-        rospy.INFO("Lifting!")
-        if self.ps4_driver._buttons[self.ps4_driver.R1] and not self.ps4_driver._buttons[self.ps4_driver.L1]: #rising edge and not lowering
-            self.ps4_driver.move_vertical(1) #lift
-        else:
-            self.ps4_driver.move_vertical(0) #no movement
+    def increaseActiveRobotID(self):
+        self.ps4_driver.active_robot = (self.ps4_driver.active_robot + 1) % len(self.ps4_driver.robotnames)
+        rospy.loginfo("Increasing active robot ID to {}".format(self.ps4_driver.active_robot))
 
-    def lowering(self):
-        rospy.INFO("Lowering!")
-        if self.ps4_driver._buttons[self.ps4_driver.L1] and not self.ps4_driver._buttons[self.ps4_driver.R1]: #rising edge and not lifting
-            self.ps4_driver.move_vertical(-1) #lower
-        else:
-            self.ps4_driver.move_vertical(0) #no movement
+
+    def decreaseActiveRobotID(self):
+        self.ps4_driver.active_robot = (self.ps4_driver.active_robot - 1) % len(self.ps4_driver.robotnames)
+        rospy.loginfo("Decreasing active robot ID to {}".format(self.ps4_driver.active_robot))
+
 
     def increaseRot(self):
         print("Increasing rot")
@@ -46,4 +42,5 @@ class Callbacks():
             self.ps4_driver.speed_translation=0.0
     
     def changeRobot(self):
-        self.ps4_driver.active_robot = (self.ps4_driver.active_robot + 1) % len(self.ps4_driver.robotnames)
+        print("Changing robot")
+        # self.ps4_driver.active_robot = (self.ps4_driver.active_robot + 1) % len(self.ps4_driver.robotnames)
