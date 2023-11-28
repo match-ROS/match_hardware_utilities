@@ -1,8 +1,9 @@
 <launch>
     <!-- Launch the driver for the ps4 controller and publish data to "ps4_input" topic -->
     
-    <arg name="robot_names"  default='["mur620c","mur620d"]'/>
+    <arg name="robot_names"  default='["virtual_leader",mur620a","mur620c","mur620d"]'/>
     <arg name="cmd_vel_topic_prefix"  default=""/>
+    <arg name="twist_stamped"  default="False"/>
     
     <node name="ps4_controller_driver" pkg="joy" type="joy_node">
         <remap from="joy" to="ps4_input"/>
@@ -16,5 +17,6 @@
         <param name="cmd_vel_topic_prefix" value="$(arg cmd_vel_topic_prefix)" />
         <param name="~autorepeat_rate" value="0.0"/>
         <rosparam param="robot_names" subst_value="True">$(arg robot_names)</rosparam>
+        <param name="twist_stamped" value="$(arg twist_stamped)" />
     </node>
 </launch>
