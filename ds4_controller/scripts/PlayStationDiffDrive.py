@@ -162,7 +162,8 @@ class PlayStationDiffDrive(PlayStationHandler):
         self.robot_publisher.publish(msg)
 
 if __name__=="__main__":
-,    rospy.init_node("ps4_diffdrive_controller", anonymous=False)
+    rospy.sleep(60)
+    rospy.init_node("ps4_diffdrive_controller", anonymous=False)
     twist_stamped = rospy.get_param("~twist_stamped")
     print(twist_stamped)
     if twist_stamped == True:
