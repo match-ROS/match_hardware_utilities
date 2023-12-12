@@ -7,6 +7,10 @@ from std_msgs.msg import ColorRGBA
 import rospy
 from callbacks import Callbacks
 
+# Controller needs to be connected, paired and trusted with bluetoothctl
+# udev rule to bild Controller to /dev/input/js2
+# robot_upstart launch file as systemd process
+
 class PlayStationDiffDrive(PlayStationHandler):
     
     is_Connected = False
