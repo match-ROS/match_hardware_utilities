@@ -3,6 +3,7 @@ from PlaystationHandler import PlayStationHandler
 from geometry_msgs.msg import Twist,TwistStamped
 from ds4ros.srv import IsConnected, SetColor, SetColorRequest, Rumble
 from mirMsgs.msg import SafetyStatus
+from mir_srvs.srv import LightCommand
 from std_msgs.msg import ColorRGBA
 import rospy
 from callbacks import Callbacks
@@ -10,6 +11,7 @@ from callbacks import Callbacks
 # Controller needs to be connected, paired and trusted with bluetoothctl
 # udev rule to bild Controller to /dev/input/js2
 # robot_upstart launch file as systemd process
+# rosservice call /light_srv "{command: 'rainbow', color1: 'ffffff', color2: 'ffffff', leds: 'all', token: '', timeout: 0.0, priority: 10000}"
 
 class PlayStationDiffDrive(PlayStationHandler):
     
@@ -127,9 +129,55 @@ class PlayStationDiffDrive(PlayStationHandler):
             # Drive
             if self.status == 2 and len(self.callbackList) != 0:
                 if len(self.callbackList) != 0:
-                    self.v_x = (1-self._axes[3]) * self.speed_translation - (1-self._axes[4]) * self.speed_translation
+                    self.v_x = (1-self._axes[4]) * self.speed_translation - (1-self._axes[3]) * self.speed_translation
                     self.rotation = (self._axes[2])*self.speed_rotation# + (self._axes[3])*self.speed_rotation
                     self.publishFunction()
+            
+            if self._buttons[1] == 1:
+                if self.speed_translation >= 1:
+                    rospy.loginfo("Max translation speed reached!")
+                else:
+                    self.speed_translation = self.speed_translation + self.speed_translation * 0.1
+                    rospy.loginfo("Set translation speed to: %s", self.speed_translation)
+                
+            if self._buttons[0] == 1:
+                if self.speed_translation <= 0.05:
+                    rospy.loginfo("Min translation speed reached!")
+                else:
+                    self.speed_translation = self.speed_translation - self.speed_translation * 0.1
+                    rospy.loginfo("Set translation speed to: %s", self.speed_translation)
+                    
+            if self._buttons[2] == 1:
+                if self.speed_rotation >= 0.5:
+                    rospy.loginfo("Max rotation speed reached!")
+                else:
+                    self.speed_rotation = self.speed_rotation + self.speed_rotation * 0.1
+                    rospy.loginfo("Set rotation speed to: %s", self.speed_rotation)
+                
+            if self._buttons[3] == 1:
+                if self.speed_rotation <= 0.05:
+                    rospy.loginfo("Min rotation speed reached!")
+                else:
+                    self.speed_rotation = self.speed_rotation - self.speed_rotation * 0.1
+                    rospy.loginfo("Set rotation speed to: %s", self.speed_rotation)
+                    
+            if self._buttons[4] == 1:
+                rospy.wait_for_service('/light_srv')
+                try:
+                    light_service = rospy.ServiceProxy('/light_srv', LightCommand)
+                    response = light_service(command='solid', color1='ffff00', color2='965000', leds='all', token='', timeout=0.0, priority=1001)
+                except rospy.ServiceException as e:
+                    print("Service call failed: %s" % e)
+                    
+            if self._buttons[5] == 1:
+                rospy.wait_for_service('/light_srv')
+                try:
+                    light_service = rospy.ServiceProxy('/light_srv', LightCommand)
+                    response = light_service(command='rainbow', color1='ffffff', color2='ffffff', leds='all', token='', timeout=0.0, priority=1000)
+                except rospy.ServiceException as e:
+                    print("Service call failed: %s" % e)
+
+                
 
             self.rate.sleep()  
 
@@ -162,7 +210,6 @@ class PlayStationDiffDrive(PlayStationHandler):
         self.robot_publisher.publish(msg)
 
 if __name__=="__main__":
-    rospy.sleep(60)
     rospy.init_node("ps4_diffdrive_controller", anonymous=False)
     twist_stamped = rospy.get_param("~twist_stamped")
     print(twist_stamped)
