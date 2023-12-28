@@ -52,7 +52,7 @@ class PlayStationDiffDrive(PlayStationHandler):
             print("Publishing as TwistStamped")
             self.publishFunction=self.publishTwistStamped
         
-        self.robot_publisher = rospy.Publisher("/cmd_vel",message_type,queue_size= 10)
+        self.robot_publisher = rospy.Publisher("/cmd_vel",message_type,queue_size=10, latch=True)
         self.mir_listener = rospy.Subscriber('/safety_status', SafetyStatus, self.callback_mir, queue_size=10)
 
     # Stop driving if protective stop received and set it to "Wait for release" if status isn't driving
@@ -210,7 +210,7 @@ class PlayStationDiffDrive(PlayStationHandler):
         self.robot_publisher.publish(msg)
 
 if __name__=="__main__":
-    rospy.sleep(30)
+    rospy.sleep(60)
     rospy.init_node("ps4_diffdrive_controller", anonymous=False)
     twist_stamped = True
     print(twist_stamped)
