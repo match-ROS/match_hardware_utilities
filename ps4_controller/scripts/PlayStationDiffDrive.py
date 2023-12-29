@@ -7,6 +7,7 @@ from callbacks import Callbacks
 class PlayStationDiffDrive(PlayStationHandler):
     def __init__(self,message_type):
         PlayStationHandler.__init__(self)
+        rospy.loginfo("Haö")
         self.load_config() #load config from param server
         self.active_robot = 0
         callbacks = Callbacks(self)
@@ -98,7 +99,7 @@ class PlayStationDiffDrive(PlayStationHandler):
 
 
 if __name__=="__main__":
-    rospy.init_node("ps4_diffdrive_controller")
+    rospy.init_node("ps4_diffdrive_controller", anonymous=True)
     twist_stamped = rospy.get_param("~twist_stamped")
     print(twist_stamped)
     if twist_stamped == True:

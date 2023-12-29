@@ -1,0 +1,7 @@
+robot: 'mur620b'
+translation: 0.1  # translational velocity
+rotation: 0.1     # rotational velocity
+trans_incr: 0.15   # Increase/Decrease translational velocity by this factor
+rot_incr: 0.15     # Increase/Decrease rotational velocity by this factor
+autorepeat_rate: 0.0
+cmd_vel_topic_prefix: ''

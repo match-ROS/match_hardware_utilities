@@ -1,0 +1,19 @@
+<launch>
+    <arg name="twist_stamped"  default="True"/>
+    <!-- Set param as appointed in /etc/udev/rules.d/99-custom-joystick.rules file -->
+
+
+    <node name="ds4drv_wrapper" pkg="ds4ros" type="ds4drv_wrapper.py" args="--hidraw" output="screen" >
+        <env name="ROS_MASTER_URI" value="http://192.168.12.20:11311" />
+    </node>
+
+    <node name="joy_node" pkg="joy" type="joy_node">
+        <env name="ROS_MASTER_URI" value="http://192.168.12.20:11311" />
+    </node>
+
+    <node name="PlayStationDiffDrive" pkg="ds4_controller" type="PlayStationDiffDrive.py" args="mur620b" output="screen">
+        <rosparam command="load" file="$(find ds4_controller)/config/controller_config.yaml"/>
+        <param name="twist_stamped" value="$(arg twist_stamped)" />
+        <env name="ROS_MASTER_URI" value="http://192.168.12.20:11311" />
+    </node>
+</launch>

@@ -50,7 +50,6 @@ class PlayStationHandler():
         self._edges = [0] * 14
         self._axes = [0] * 8
         self.__sub_joy = rospy.Subscriber('/joy', Joy, self.__joy_callback__, queue_size=10)
-        rospy.loginfo("Test111111111111111111111111111111")
 
 
     def __joy_callback__(self, msg):
