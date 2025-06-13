@@ -26,7 +26,7 @@ const static double KEYENCE_INFINITE_DISTANCE_VALUE_SI = -999.9990 / 1e3;
 const static double KEYENCE_INFINITE_DISTANCE_VALUE_SI2 = -999.9970 / 1e3;
 
 // default values for parameters
-const static std::string DEFAULT_FRAME_ID = "sensor_optical_frame"; //sensor_optical_frame
+const static std::string DEFAULT_FRAME_ID = "sensor_frame"; //sensor_optical_frame
 
 // local types
 typedef pcl::PointCloud<pcl::PointXYZ> Cloud;
