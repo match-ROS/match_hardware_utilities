@@ -1,5 +1,14 @@
 # match Hardware Utilities
 
+
+### Install USB-to-CAN-adapter for MuR Batteries ###
+
+`sudo apt-get update`
+`sudo apt-get install can-utils`
+`sudo apt-get install socketcan`
+`pip install python-can`
+
+
 ### Installation of DualShock Support
 
 #### Install driver ds4drv
