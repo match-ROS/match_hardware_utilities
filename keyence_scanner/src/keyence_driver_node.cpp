@@ -2,6 +2,7 @@
 
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
+#include <pcl_conversions/pcl_conversions.h>
 
 #include <limits>
 
@@ -12,8 +13,9 @@
 #include <keyence/impl/messages/get_setting.h>
 #include <keyence/impl/settings_defs.h>
 
-#include "boost/bind.hpp"
-#include "boost/ref.hpp"
+#include <boost/bind/bind.hpp>
+using namespace boost::placeholders;
+#include <boost/ref.hpp>
 
 #include "keyence_scanner/ChangeProgram.h"
 
@@ -253,7 +255,8 @@ int main(int argc, char** argv)
   pc_msg->height = 1;
 
   // set up profile cloud publisher
-  ros::Publisher pub = nh.advertise<Cloud>("profiles", 100);
+  // ros::Publisher pub = nh.advertise<Cloud>("profiles", 100);
+  ros::Publisher pub = nh.advertise<pcl::PointCloud<pcl::PointXYZ>>("profiles", 100);
 
   bool active_flag = true;
 
@@ -322,7 +325,7 @@ int main(int argc, char** argv)
           unpackProfileToPointCloud(resp.body.profile_info, resp.body.profile_points, *pc_msg, true);
 
           // publish pointcloud
-          pub.publish(pc_msg);
+          pub.publish(*pc_msg);
         }
       } // end main loop
     }

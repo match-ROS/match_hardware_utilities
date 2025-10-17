@@ -13,6 +13,8 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   roscpp
   std_msgs
+  pcl_conversions
+  sensor_msgs
 )
 
 ## Driver makes use of the libsocket libraries
