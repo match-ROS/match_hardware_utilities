@@ -6,8 +6,10 @@ import sys
 
 import rospy
 from std_msgs.msg import Float32MultiArray
+from sensor_msgs.msg import PointCloud2, PointField
+import std_msgs.msg
 
-import LJXAwrap  # liegt bei dir schon neben den Samples
+import LJXAwrap  # muss im PYTHONPATH liegen (wie bei den Keyence-Samples)
 
 
 class KeyenceProfileNode(object):
@@ -22,8 +24,11 @@ class KeyenceProfileNode(object):
         self.xpoint_num = rospy.get_param("~xpoint_num", 3200)  # X-Punkte pro Profil
         self.with_lumi = rospy.get_param("~with_luminance", 1)  # 1 = inkl. Luminanzdaten
         self.start_measure = rospy.get_param("~start_measure", False)
+        self.frame_id = rospy.get_param("~frame_id", "keyence_frame")
 
-        self.pub = rospy.Publisher("/profiles", Float32MultiArray, queue_size=1)
+        # Publisher
+        self.raw_pub = rospy.Publisher("/profiles", Float32MultiArray, queue_size=1)
+        self.pc_pub = rospy.Publisher("/profiles_cloud", PointCloud2, queue_size=1)
 
         # --- Ethernet-Konfig setzen (wie in den Samples) ---
         self.eth_cfg = LJXAwrap.LJX8IF_ETHERNET_CONFIG()
@@ -62,12 +67,12 @@ class KeyenceProfileNode(object):
         # Buffergröße wie im Keyence-Sample berechnen
         header_size = ctypes.sizeof(LJXAwrap.LJX8IF_PROFILE_HEADER)
         footer_size = ctypes.sizeof(LJXAwrap.LJX8IF_PROFILE_FOOTER)
-        data_size = header_size + footer_size
-        data_size += ctypes.sizeof(ctypes.c_uint) * self.xpoint_num * (1 + self.with_lumi)
-        data_size *= self.req.byGetProfileCount
+        dataSize = header_size + footer_size
+        dataSize += ctypes.sizeof(ctypes.c_uint) * self.xpoint_num * (1 + self.with_lumi)
+        dataSize *= self.req.byGetProfileCount
 
-        self.data_size = ctypes.c_uint(data_size)
-        data_num_in_4byte = int(data_size / ctypes.sizeof(ctypes.c_uint))
+        self.data_size = ctypes.c_uint(dataSize)
+        data_num_in_4byte = int(dataSize / ctypes.sizeof(ctypes.c_uint))
         self.profil_buf = (ctypes.c_int * data_num_in_4byte)()
 
         rospy.loginfo("Profile buffer: xpoints=%d, with_lumi=%d, bytes=%d",
@@ -109,25 +114,83 @@ class KeyenceProfileNode(object):
 
         # Offsets (wie im Keyence-Sample)
         header_size = ctypes.sizeof(LJXAwrap.LJX8IF_PROFILE_HEADER)
-        offset_height = int(header_size / ctypes.sizeof(ctypes.c_uint))
-        # offset_lumi = offset_height + x_count  # falls du später Luminanz brauchst
+        addressOffset_height = int(header_size / ctypes.sizeof(ctypes.c_uint))
+        addressOffset_lumi = addressOffset_height + x_count  # falls Luminanz später nötig
 
-        # Z-Werte in mm (gleiche Skalierung wie sample_HowToCallFunctions)
+        # ---- 1) Float32MultiArray (Z in mm) ----
         z_vals_mm = []
         for i in range(x_count):
-            z_val = self.profil_buf[offset_height + i]
-
-            # Ungültige Werte (siehe Sample)
-            if z_val <= -2147483645:
+            z_val = self.profil_buf[addressOffset_height + i]
+            if z_val <= -2147483645:  # invalid value
                 z_vals_mm.append(float("nan"))
             else:
-                z_mm = z_val / 100.0  # 0.01 µm -> µm
-                z_mm /= 1000.0        # µm -> mm
+                z_mm = z_val / 100.0   # 0.01 µm -> µm
+                z_mm /= 1000.0         # µm -> mm
                 z_vals_mm.append(z_mm)
 
-        msg = Float32MultiArray()
-        msg.data = z_vals_mm
-        self.pub.publish(msg)
+        raw_msg = Float32MultiArray()
+        raw_msg.data = z_vals_mm
+        self.raw_pub.publish(raw_msg)
+
+        # ---- 2) PointCloud2 für RViz (x,z in Metern) ----
+        # X: aus lXStart / lXPitch (einheiten wie im Sample) -> zuerst mm, dann m
+        # Z: aus z_vals_mm -> mm -> m
+        points = []
+        for i in range(x_count):
+            # X in mm
+            x_val = (self.info.lXStart + self.info.lXPitch * i) / 100.0  # µm
+            x_val /= 1000.0  # mm
+            # in Meter
+            x_m = x_val / 1000.0
+
+            # Z in m (falls NaN, einfach NaN lassen)
+            z_mm = z_vals_mm[i]
+            if z_mm != z_mm:  # NaN-Check
+                z_m = float("nan")
+            else:
+                z_m = z_mm / 1000.0
+
+            y_m = 0.0
+            points.append((x_m, y_m, z_m))
+
+        pc_msg = self._points_to_pointcloud2(points,
+                                             frame_id=self.frame_id,
+                                             stamp=rospy.Time.now())
+        self.pc_pub.publish(pc_msg)
+
+    @staticmethod
+    def _points_to_pointcloud2(points, frame_id="keyence_frame", stamp=None):
+        """
+        points: List[(x,y,z)] in Meter
+        """
+        pc = PointCloud2()
+        if stamp is None:
+            stamp = rospy.Time.now()
+
+        pc.header = std_msgs.msg.Header()
+        pc.header.stamp = stamp
+        pc.header.frame_id = frame_id
+
+        pc.height = 1
+        pc.width = len(points)
+        pc.is_bigendian = False
+        pc.is_dense = False
+
+        pc.fields = [
+            PointField(name="x", offset=0,  datatype=PointField.FLOAT32, count=1),
+            PointField(name="y", offset=4,  datatype=PointField.FLOAT32, count=1),
+            PointField(name="z", offset=8,  datatype=PointField.FLOAT32, count=1),
+        ]
+        pc.point_step = 12
+        pc.row_step = pc.point_step * pc.width
+
+        import struct
+        buff = []
+        for x, y, z in points:
+            buff.append(struct.pack("fff", float(x), float(y), float(z)))
+        pc.data = b"".join(buff)
+
+        return pc
 
 
 if __name__ == "__main__":
