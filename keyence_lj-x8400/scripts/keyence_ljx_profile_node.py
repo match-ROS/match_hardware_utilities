@@ -20,15 +20,15 @@ class KeyenceProfileNode(object):
         self.device_id = rospy.get_param("~device_id", 0)
         ip_str = rospy.get_param("~ip_address", "192.168.12.88")
         self.port = rospy.get_param("~port", 24691)
-        self.rate_hz = rospy.get_param("~rate", 10.0)           # Profilrate ROS-seitig
+        self.rate_hz = rospy.get_param("~rate", 20.0)           # Profilrate ROS-seitig
         self.xpoint_num = rospy.get_param("~xpoint_num", 3200)  # X-Punkte pro Profil
         self.with_lumi = rospy.get_param("~with_luminance", 1)  # 1 = inkl. Luminanzdaten
         self.start_measure = rospy.get_param("~start_measure", False)
         self.frame_id = rospy.get_param("~frame_id", "keyence_frame")
 
         # Publisher
-        self.raw_pub = rospy.Publisher("/profiles", Float32MultiArray, queue_size=1)
-        self.pc_pub = rospy.Publisher("/profiles_cloud", PointCloud2, queue_size=1)
+        self.raw_pub = rospy.Publisher("/profiles_float", Float32MultiArray, queue_size=1)
+        self.pc_pub = rospy.Publisher("/profiles", PointCloud2, queue_size=1)
 
         # --- Ethernet-Konfig setzen (wie in den Samples) ---
         self.eth_cfg = LJXAwrap.LJX8IF_ETHERNET_CONFIG()
