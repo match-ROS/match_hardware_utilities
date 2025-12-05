@@ -157,23 +157,23 @@ class KeyenceProfileNode(object):
             y_m = 0.0
             points.append((x_m, y_m, z_m))
 
-            pc_msg = self._points_to_pointcloud2(points,
-                                                frame_id=self.frame_id,
-                                                stamp=rospy.Time.now())
+        pc_msg = self._points_to_pointcloud2(points,
+                                            frame_id=self.frame_id,
+                                            stamp=rospy.Time.now())
 
-            try:
-                # Get latest time at which both frames are connected
-                common_time = self.tf_listener.getLatestCommonTime(self.map_frame, self.frame_id)
+        try:
+            # Get latest time at which both frames are connected
+            common_time = self.tf_listener.getLatestCommonTime(self.map_frame, self.frame_id)
 
-                pc_msg.header.stamp = common_time  # <-- wichtige Anpassung
+            pc_msg.header.stamp = common_time  # <-- wichtige Anpassung
 
-                pc_msg = self.transform_pointcloud2(pc_msg, self.map_frame)
+            pc_msg = self.transform_pointcloud2(pc_msg, self.map_frame)
 
-            except Exception as e:
-                rospy.logwarn_throttle(1.0, f"No TF available yet: {e}")
-                pass
+        except Exception as e:
+            rospy.logwarn_throttle(1.0, f"No TF available yet: {e}")
+            pass
 
-            self.pc_pub.publish(pc_msg)
+        self.pc_pub.publish(pc_msg)
 
     def transform_pointcloud2(self, pc_msg, target_frame):
         # Convert to PointCloud
