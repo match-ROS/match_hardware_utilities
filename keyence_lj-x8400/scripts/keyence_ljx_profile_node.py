@@ -3,11 +3,12 @@
 
 import ctypes
 import sys
-
+import tf
 import rospy
 from std_msgs.msg import Float32MultiArray
 from sensor_msgs.msg import PointCloud2, PointField
 import std_msgs.msg
+import sensor_msgs.point_cloud2 as pc2
 
 import LJXAwrap  # muss im PYTHONPATH liegen (wie bei den Keyence-Samples)
 
@@ -15,16 +16,19 @@ import LJXAwrap  # muss im PYTHONPATH liegen (wie bei den Keyence-Samples)
 class KeyenceProfileNode(object):
     def __init__(self):
         rospy.init_node("keyence_ljx_profile_node")
+        self.tf_listener = tf.TransformListener()
 
         # --- Parameter ---
         self.device_id = rospy.get_param("~device_id", 0)
         ip_str = rospy.get_param("~ip_address", "192.168.12.88")
         self.port = rospy.get_param("~port", 24691)
-        self.rate_hz = rospy.get_param("~rate", 20.0)           # Profilrate ROS-seitig
+        self.rate_hz = rospy.get_param("~rate", 40.0)           # Profilrate ROS-seitig
         self.xpoint_num = rospy.get_param("~xpoint_num", 3200)  # X-Punkte pro Profil
         self.with_lumi = rospy.get_param("~with_luminance", 1)  # 1 = inkl. Luminanzdaten
         self.start_measure = rospy.get_param("~start_measure", False)
         self.frame_id = rospy.get_param("~frame_id", "keyence_frame")
+        self.publish_profiles_in_map = rospy.get_param("~publish_profiles_in_map", True)
+        self.map_frame = rospy.get_param("~map_frame", "map")
 
         # Publisher
         self.raw_pub = rospy.Publisher("/profiles_float", Float32MultiArray, queue_size=1)
@@ -153,10 +157,46 @@ class KeyenceProfileNode(object):
             y_m = 0.0
             points.append((x_m, y_m, z_m))
 
-        pc_msg = self._points_to_pointcloud2(points,
-                                             frame_id=self.frame_id,
-                                             stamp=rospy.Time.now())
-        self.pc_pub.publish(pc_msg)
+            pc_msg = self._points_to_pointcloud2(points,
+                                                frame_id=self.frame_id,
+                                                stamp=rospy.Time.now())
+
+            try:
+                # Get latest time at which both frames are connected
+                common_time = self.tf_listener.getLatestCommonTime(self.map_frame, self.frame_id)
+
+                pc_msg.header.stamp = common_time  # <-- wichtige Anpassung
+
+                pc_msg = self.transform_pointcloud2(pc_msg, self.map_frame)
+
+            except Exception as e:
+                rospy.logwarn_throttle(1.0, f"No TF available yet: {e}")
+                pass
+
+            self.pc_pub.publish(pc_msg)
+
+    def transform_pointcloud2(self, pc_msg, target_frame):
+        # Convert to PointCloud
+        from geometry_msgs.msg import Point32
+        from sensor_msgs.msg import PointCloud
+
+        pc = PointCloud()
+        pc.header = pc_msg.header
+        for p in pc2.read_points(pc_msg, skip_nans=False):
+            pt = Point32()
+            pt.x, pt.y, pt.z = p[0], p[1], p[2]
+            pc.points.append(pt)
+
+        # Transform
+        pc_tf = self.tf_listener.transformPointCloud(target_frame, pc)
+
+        # Back to PointCloud2
+        out = self._points_to_pointcloud2(
+            [(p.x, p.y, p.z) for p in pc_tf.points],
+            frame_id=target_frame,
+            stamp=pc_msg.header.stamp
+        )
+        return out
 
     @staticmethod
     def _points_to_pointcloud2(points, frame_id="keyence_frame", stamp=None):
