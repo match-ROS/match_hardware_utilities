@@ -3,85 +3,84 @@
 
 import ctypes
 import sys
-import tf
+import struct
+import numpy as np
+
 import rospy
+import tf
+
 from std_msgs.msg import Float32MultiArray
 from sensor_msgs.msg import PointCloud2, PointField
 import std_msgs.msg
-import sensor_msgs.point_cloud2 as pc2
 
-import LJXAwrap  # muss im PYTHONPATH liegen (wie bei den Keyence-Samples)
+import LJXAwrap  # Keyence API wrapper
 
 
 class KeyenceProfileNode(object):
     def __init__(self):
         rospy.init_node("keyence_ljx_profile_node")
+
+        # TF
         self.tf_listener = tf.TransformListener()
 
         # --- Parameter ---
         self.device_id = rospy.get_param("~device_id", 0)
         ip_str = rospy.get_param("~ip_address", "192.168.12.88")
         self.port = rospy.get_param("~port", 24691)
-        self.rate_hz = rospy.get_param("~rate", 40.0)           # Profilrate ROS-seitig
-        self.xpoint_num = rospy.get_param("~xpoint_num", 3200)  # X-Punkte pro Profil
-        self.with_lumi = rospy.get_param("~with_luminance", 1)  # 1 = inkl. Luminanzdaten
+        self.rate_hz = rospy.get_param("~rate", 40.0)
+        self.xpoint_num = rospy.get_param("~xpoint_num", 3200)
+        self.with_lumi = rospy.get_param("~with_luminance", 1)
         self.start_measure = rospy.get_param("~start_measure", False)
         self.frame_id = rospy.get_param("~frame_id", "keyence_frame")
         self.publish_profiles_in_map = rospy.get_param("~publish_profiles_in_map", True)
         self.map_frame = rospy.get_param("~map_frame", "map")
 
+        # Optional Downsampling
+        self.downsample = rospy.get_param("~downsample", 1)  # 1=no DS, 2=50%, 4=25%, etc
+
         # Publisher
         self.raw_pub = rospy.Publisher("/profiles_float", Float32MultiArray, queue_size=1)
         self.pc_pub = rospy.Publisher("/profiles", PointCloud2, queue_size=1)
 
-        # --- Ethernet-Konfig setzen (wie in den Samples) ---
+        # --- Ethernet config ---
         self.eth_cfg = LJXAwrap.LJX8IF_ETHERNET_CONFIG()
         ip_parts = [int(x) for x in ip_str.split(".")]
-        if len(ip_parts) != 4:
-            rospy.logfatal("ip_address must have 4 octets, got: %s", ip_str)
-            sys.exit(1)
         for i in range(4):
             self.eth_cfg.abyIpAddress[i] = ip_parts[i]
         self.eth_cfg.wPortNo = self.port
 
-        # --- Verbindung öffnen ---
+        # Connect
         res = LJXAwrap.LJX8IF_EthernetOpen(self.device_id, self.eth_cfg)
-        rospy.loginfo("LJX8IF_EthernetOpen: 0x%X", res)
+        rospy.loginfo("EthernetOpen: 0x%X", res)
         if res != 0:
             rospy.logfatal("Failed to connect controller")
             sys.exit(1)
 
-        # optional Messung starten (falls Controller nicht extern getriggert wird)
         if self.start_measure:
-            res = LJXAwrap.LJX8IF_StartMeasure(self.device_id)
-            rospy.loginfo("LJX8IF_StartMeasure: 0x%X", res)
+            LJXAwrap.LJX8IF_StartMeasure(self.device_id)
 
-        # --- Request/Response/Info-Strukturen vorbereiten ---
+        # Profile structures
         self.req = LJXAwrap.LJX8IF_GET_PROFILE_REQUEST()
         self.rsp = LJXAwrap.LJX8IF_GET_PROFILE_RESPONSE()
         self.info = LJXAwrap.LJX8IF_PROFILE_INFO()
 
-        # Wie im Sample: von aktueller Position, 1 Profil, nichts löschen
-        self.req.byTargetBank = 0x0      # aktive Bank
-        self.req.byPositionMode = 0x0    # 0: from current position
-        self.req.dwGetProfileNo = 0x0
+        self.req.byTargetBank = 0
+        self.req.byPositionMode = 0
+        self.req.dwGetProfileNo = 0
         self.req.byGetProfileCount = 1
         self.req.byErase = 0
 
-        # Buffergröße wie im Keyence-Sample berechnen
-        header_size = ctypes.sizeof(LJXAwrap.LJX8IF_PROFILE_HEADER)
-        footer_size = ctypes.sizeof(LJXAwrap.LJX8IF_PROFILE_FOOTER)
-        dataSize = header_size + footer_size
-        dataSize += ctypes.sizeof(ctypes.c_uint) * self.xpoint_num * (1 + self.with_lumi)
-        dataSize *= self.req.byGetProfileCount
+        # Buffer size
+        header = ctypes.sizeof(LJXAwrap.LJX8IF_PROFILE_HEADER)
+        footer = ctypes.sizeof(LJXAwrap.LJX8IF_PROFILE_FOOTER)
+        datasize = header + footer
+        datasize += ctypes.sizeof(ctypes.c_uint) * self.xpoint_num * (1 + self.with_lumi)
+        self.data_size = ctypes.c_uint(datasize)
 
-        self.data_size = ctypes.c_uint(dataSize)
-        data_num_in_4byte = int(dataSize / ctypes.sizeof(ctypes.c_uint))
-        self.profil_buf = (ctypes.c_int * data_num_in_4byte)()
+        n_ints = int(datasize / ctypes.sizeof(ctypes.c_uint))
+        self.profil_buf = (ctypes.c_int * n_ints)()
 
-        rospy.loginfo("Profile buffer: xpoints=%d, with_lumi=%d, bytes=%d",
-                      self.xpoint_num, self.with_lumi, self.data_size.value)
-
+    # ----------------------------------------------------------
     def spin(self):
         rate = rospy.Rate(self.rate_hz)
         try:
@@ -89,13 +88,13 @@ class KeyenceProfileNode(object):
                 self.read_and_publish_profile()
                 rate.sleep()
         finally:
-            # Aufräumen
             if self.start_measure:
                 LJXAwrap.LJX8IF_StopMeasure(self.device_id)
             LJXAwrap.LJX8IF_CommunicationClose(self.device_id)
 
+    # ----------------------------------------------------------
     def read_and_publish_profile(self):
-        # Profil abfragen
+        # --- Keyence Call (fast) ---
         res = LJXAwrap.LJX8IF_GetProfile(
             self.device_id,
             ctypes.byref(self.req),
@@ -104,133 +103,86 @@ class KeyenceProfileNode(object):
             self.profil_buf,
             self.data_size,
         )
-
         if res != 0:
-            rospy.logwarn_throttle(1.0, "LJX8IF_GetProfile error: 0x%X", res)
+            rospy.logwarn_throttle(1.0, "GetProfile error: 0x%X" % res)
             return
 
         x_count = self.info.wProfileDataCount
-        if x_count <= 0 or x_count > self.xpoint_num:
-            rospy.logwarn_throttle(1.0,
-                                   "Unexpected wProfileDataCount=%d (xpoint_num=%d)",
-                                   x_count, self.xpoint_num)
-            return
 
-        # Offsets (wie im Keyence-Sample)
+        # Parse height values (vectorized)
         header_size = ctypes.sizeof(LJXAwrap.LJX8IF_PROFILE_HEADER)
-        addressOffset_height = int(header_size / ctypes.sizeof(ctypes.c_uint))
-        addressOffset_lumi = addressOffset_height + x_count  # falls Luminanz später nötig
+        offset_h = int(header_size / 4)
 
-        # ---- 1) Float32MultiArray (Z in mm) ----
-        z_vals_mm = []
-        for i in range(x_count):
-            z_val = self.profil_buf[addressOffset_height + i]
-            if z_val <= -2147483645:  # invalid value
-                z_vals_mm.append(float("nan"))
-            else:
-                z_mm = z_val / 100.0   # 0.01 µm -> µm
-                z_mm /= 1000.0         # µm -> mm
-                z_vals_mm.append(z_mm)
+        raw_data = np.frombuffer(self.profil_buf, dtype=np.int32, count=x_count, offset=header_size)
 
+        # invalid values → NaN
+        z_mm = np.where(raw_data <= -2147483645, np.nan, raw_data.astype(np.float32) * 1e-6)
+
+        # Publish raw float profile
         raw_msg = Float32MultiArray()
-        raw_msg.data = z_vals_mm
+        raw_msg.data = z_mm.tolist()
         self.raw_pub.publish(raw_msg)
 
-        # ---- 2) PointCloud2 für RViz (x,z in Metern) ----
-        # X: aus lXStart / lXPitch (einheiten wie im Sample) -> zuerst mm, dann m
-        # Z: aus z_vals_mm -> mm -> m
-        points = []
-        for i in range(x_count):
-            # X in mm
-            x_val = (self.info.lXStart + self.info.lXPitch * i) / 100.0  # µm
-            x_val /= 1000.0  # mm
-            # in Meter
-            x_m = x_val / 1000.0
+        # ------------------------------------------------------
+        # Build 3D points (NumPy, vectorized)
+        # ------------------------------------------------------
+        # X (µm → m)
+        xs = (self.info.lXStart + self.info.lXPitch * np.arange(x_count)) * 1e-6
+        ys = np.zeros_like(xs)
+        zs = z_mm * 1e-3  # mm → m
 
-            # Z in m (falls NaN, einfach NaN lassen)
-            z_mm = z_vals_mm[i]
-            if z_mm != z_mm:  # NaN-Check
-                z_m = float("nan")
-            else:
-                z_m = z_mm / 1000.0
+        # downsample
+        if self.downsample > 1:
+            xs = xs[::self.downsample]
+            ys = ys[::self.downsample]
+            zs = zs[::self.downsample]
 
-            y_m = 0.0
-            points.append((x_m, y_m, z_m))
+        P = np.column_stack([xs, ys, zs])  # shape (N,3)
 
-        pc_msg = self._points_to_pointcloud2(points,
-                                            frame_id=self.frame_id,
-                                            stamp=rospy.Time.now())
+        # ------------------------------------------------------
+        # Transform points into map via TF (NumPy, fast)
+        # ------------------------------------------------------
+        if self.publish_profiles_in_map:
+            try:
+                trans, rot = self.tf_listener.lookupTransform(self.map_frame, self.frame_id, rospy.Time(0))
+                T = tf.transformations.quaternion_matrix(rot)
+                T[:3, 3] = trans
 
-        try:
-            # Get latest time at which both frames are connected
-            common_time = self.tf_listener.getLatestCommonTime(self.map_frame, self.frame_id)
+                # Homogeneous transform
+                P_h = np.hstack([P, np.ones((P.shape[0], 1))])
+                P = (T @ P_h.T).T[:, :3]
 
-            pc_msg.header.stamp = common_time  # <-- wichtige Anpassung
+                frame_out = self.map_frame
+            except Exception:
+                frame_out = self.frame_id
+        else:
+            frame_out = self.frame_id
 
-            pc_msg = self.transform_pointcloud2(pc_msg, self.map_frame)
+        # ------------------------------------------------------
+        # Build PointCloud2 (one fast pack)
+        # ------------------------------------------------------
+        stamp = rospy.Time.now()
+        pc_msg = PointCloud2()
+        pc_msg.header = std_msgs.msg.Header(stamp=stamp, frame_id=frame_out)
 
-        except Exception as e:
-            rospy.logwarn_throttle(1.0, f"No TF available yet: {e}")
-            pass
+        pc_msg.height = 1
+        pc_msg.width = len(P)
+        pc_msg.fields = [
+            PointField("x", 0, PointField.FLOAT32, 1),
+            PointField("y", 4, PointField.FLOAT32, 1),
+            PointField("z", 8, PointField.FLOAT32, 1),
+        ]
+        pc_msg.is_bigendian = False
+        pc_msg.point_step = 12
+        pc_msg.row_step = pc_msg.point_step * pc_msg.width
+        pc_msg.is_dense = False
+
+        # struct.pack in einem einzigen Schritt → extrem schnell
+        pc_msg.data = struct.pack("<%df" % (P.size), *P.flatten())
 
         self.pc_pub.publish(pc_msg)
 
-    def transform_pointcloud2(self, pc_msg, target_frame):
-        # Convert to PointCloud
-        from geometry_msgs.msg import Point32
-        from sensor_msgs.msg import PointCloud
-
-        pc = PointCloud()
-        pc.header = pc_msg.header
-        for p in pc2.read_points(pc_msg, skip_nans=False):
-            pt = Point32()
-            pt.x, pt.y, pt.z = p[0], p[1], p[2]
-            pc.points.append(pt)
-
-        # Transform
-        pc_tf = self.tf_listener.transformPointCloud(target_frame, pc)
-
-        # Back to PointCloud2
-        out = self._points_to_pointcloud2(
-            [(p.x, p.y, p.z) for p in pc_tf.points],
-            frame_id=target_frame,
-            stamp=pc_msg.header.stamp
-        )
-        return out
-
-    @staticmethod
-    def _points_to_pointcloud2(points, frame_id="keyence_frame", stamp=None):
-        """
-        points: List[(x,y,z)] in Meter
-        """
-        pc = PointCloud2()
-        if stamp is None:
-            stamp = rospy.Time.now()
-
-        pc.header = std_msgs.msg.Header()
-        pc.header.stamp = stamp
-        pc.header.frame_id = frame_id
-
-        pc.height = 1
-        pc.width = len(points)
-        pc.is_bigendian = False
-        pc.is_dense = False
-
-        pc.fields = [
-            PointField(name="x", offset=0,  datatype=PointField.FLOAT32, count=1),
-            PointField(name="y", offset=4,  datatype=PointField.FLOAT32, count=1),
-            PointField(name="z", offset=8,  datatype=PointField.FLOAT32, count=1),
-        ]
-        pc.point_step = 12
-        pc.row_step = pc.point_step * pc.width
-
-        import struct
-        buff = []
-        for x, y, z in points:
-            buff.append(struct.pack("fff", float(x), float(y), float(z)))
-        pc.data = b"".join(buff)
-
-        return pc
+    # ----------------------------------------------------------
 
 
 if __name__ == "__main__":
@@ -240,5 +192,5 @@ if __name__ == "__main__":
     except rospy.ROSInterruptException:
         pass
     except Exception as e:
-        rospy.logfatal("Exception in keyence_ljx_profile_node: %s", e)
+        rospy.logfatal("Exception: %s", e)
         sys.exit(1)
