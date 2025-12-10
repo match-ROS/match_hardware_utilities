@@ -127,7 +127,7 @@ class KeyenceProfileNode(object):
         # Build 3D points (NumPy, vectorized)
         # ------------------------------------------------------
         # X (µm → m)
-        xs = (self.info.lXStart + self.info.lXPitch * np.arange(x_count)) * 1e-6
+        xs = (self.info.lXStart + self.info.lXPitch * np.arange(x_count)) * 1e-8
         ys = np.zeros_like(xs)
         zs = z_mm * 1e-3  # mm → m
 
@@ -194,3 +194,6 @@ if __name__ == "__main__":
     except Exception as e:
         rospy.logfatal("Exception: %s", e)
         sys.exit(1)
+
+
+
