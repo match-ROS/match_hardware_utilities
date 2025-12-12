@@ -116,7 +116,7 @@ class KeyenceProfileNode(object):
         raw_data = np.frombuffer(self.profil_buf, dtype=np.int32, count=x_count, offset=header_size)
 
         # invalid values → NaN
-        z_mm = np.where(raw_data <= -2147483645, np.nan, raw_data.astype(np.float32) * 1e-6)
+        z_mm = np.where(raw_data <= -2147483645, np.nan, raw_data.astype(np.float32) * 1e-5)
 
         # Publish raw float profile
         raw_msg = Float32MultiArray()
