@@ -1,7 +1,17 @@
 import struct
 import socket
 import threading
-from net_box_hardware_helper import NetBoxEnums as enum
+
+class NetBoxEnums:
+    STOP_STREAMING = 0x0000
+    START_RT_STREAMING = 0x0002
+    START_BUFFERED_STREAMING = 0x0003
+    RESET_TRESH_LATCH = 0x0041
+    SET_SOFTWARE_BIAS = 0x0042
+    START_IDENTIFIER = 0x1234
+
+
+enum = NetBoxEnums()
 
 class NetBoxSocket:
     def __init__(self, ip_adress, port):
@@ -89,7 +99,7 @@ class NetBoxSampleGenerator:
 
 
 class NetBoxMeasurement:
-    stamp=long()
+    stamp=int()
     Fx=float()
     Fy=float()
     Fz=float()
