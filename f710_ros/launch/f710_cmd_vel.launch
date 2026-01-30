@@ -1,0 +1,7 @@
+<launch>
+    <arg name="mur_namespace" default="mur620c"/>
+<!-- Launch file to publish cmd_vel messages based on joystick input -->
+    <node pkg="f710_ros" type="f710_cmd_vel.py" name="f710_cmd_vel" output="screen">
+        <param name="mur_namespace" value="$(arg mur_namespace)"/>
+    </node>
+</launch>
