@@ -4,6 +4,7 @@ import time
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Joy
 import numpy as np
+from copy import deepcopy
 
 
 class JoyCmdVelRelay:
@@ -15,16 +16,18 @@ class JoyCmdVelRelay:
         self.joy_topic = rospy.get_param("~joy_topic", "/joy")
 
         self.publish_rate = rospy.get_param("~publish_rate", 50.0)   # Hz
-        self.joy_timeout = rospy.get_param("~joy_timeout", 0.5)      # s
+        self.joy_timeout = rospy.get_param("~joy_timeout", 10.5)      # s
 
         self.max_lin_acc = rospy.get_param("~max_lin_acc", 0.4)       # m/s²
         self.max_ang_acc = rospy.get_param("~max_ang_acc", 0.6)       # rad/s²
 
         # --- State ---
         self.last_joy_time = 0.0
+        self.enabled = False
 
         self.cmd_target = Twist()     # letzter Joy-Sollwert
         self.cmd_current = Twist()    # tatsächlich gesendeter Wert
+        self.cmd_old = Twist()        # vorheriger gesendeter Wert
 
         # --- ROS ---
         self.pub = rospy.Publisher(self.cmd_vel_topic, Twist, queue_size=1)
@@ -40,18 +43,33 @@ class JoyCmdVelRelay:
     def joy_cb(self, msg: Joy):
         self.last_joy_time = rospy.get_time()
 
+        # -------- Enable-Sequenz --------
+        lt = msg.axes[2]
+        rt = msg.axes[5]
+
+        if not self.enabled:
+            if lt <= -0.99 and rt <= -0.99:
+                rospy.loginfo("Controller ENABLED")
+                self.enabled = True
+            else:
+                # optional: aktiv stoppen
+                rospy.loginfo_throttle(5.0, "Controller disabled; waiting for both triggers to be pressed to enable.")
+                #self.pub.publish(Twist())
+                return
+
+
         # -----------------------------
         # Achsen-Indizes (Logitech F710, X-Mode!)
         # -----------------------------
-        AX_LEFT_X   = 0
+        AX_LEFT_X   = 7
         AX_LEFT_Y   = 1
         AX_RIGHT_X  = 3
 
         AX_LT = 2   # linker Trigger  (-1 ungedrückt → +1 gedrückt)
         AX_RT = 5   # rechter Trigger
 
-        AX_DPAD_X = 6
-        AX_DPAD_Y = 7
+        AX_DPAD_X = 0
+        AX_DPAD_Y = 1
 
         # -----------------------------
         # Geschwindigkeitsgrenzen
@@ -84,10 +102,10 @@ class JoyCmdVelRelay:
         # Linear.x: Trigger
         # -----------------------------
         # Trigger sind [-1, 1] → auf [0, 1] normieren
-        rt = (1.0 - msg.axes[AX_RT]) * 0.5
+        rt = ( msg.axes[AX_RT]-1) * 0.5
         lt = (1.0 - msg.axes[AX_LT]) * 0.5
 
-        lin = rt - lt
+        lin = - rt - lt
         self.cmd_target.linear.x = lin * self.max_lin_speed
 
 
@@ -123,8 +141,11 @@ class JoyCmdVelRelay:
             dt
         )
 
+        if self.cmd_current.linear.x == 0.0 and self.cmd_current.angular.z == 0.0 and self.cmd_old.linear.x == 0.0 and self.cmd_old.angular.z == 0.0:
+            # Beide Werte sind 0, nichts ändern und nicht senden
+            return
         self.pub.publish(self.cmd_current)
-
+        self.cmd_old = deepcopy(self.cmd_current)
     # --------------------------------------------------
 
     @staticmethod
