@@ -9,7 +9,7 @@ import numpy as np
 import rospy
 import tf
 
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Float32MultiArray, Float32
 from sensor_msgs.msg import PointCloud2, PointField
 import std_msgs.msg
 
@@ -41,6 +41,7 @@ class KeyenceProfileNode(object):
         # Publisher
         self.raw_pub = rospy.Publisher("/profiles_float", Float32MultiArray, queue_size=1)
         self.pc_pub = rospy.Publisher("/profiles", PointCloud2, queue_size=1)
+        self.pitch_pub = rospy.Publisher("/profiles_pitch_m", Float32, queue_size=1, latch=True)
 
         # --- Ethernet config ---
         self.eth_cfg = LJXAwrap.LJX8IF_ETHERNET_CONFIG()
@@ -122,6 +123,10 @@ class KeyenceProfileNode(object):
         raw_msg = Float32MultiArray()
         raw_msg.data = z_mm.tolist()
         self.raw_pub.publish(raw_msg)
+
+        # Publish lateral pitch (meters per index), include downsampling
+        pitch_m = float(self.info.lXPitch) * 1e-8 * float(self.downsample)
+        self.pitch_pub.publish(Float32(data=pitch_m))
 
         # ------------------------------------------------------
         # Build 3D points (NumPy, vectorized)
