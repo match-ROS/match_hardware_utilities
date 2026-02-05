@@ -12,7 +12,7 @@ class JoyCmdVelRelay:
         rospy.init_node("joy_cmd_vel_relay")
 
         # --- Parameter ---
-        self.cmd_vel_topic = rospy.get_param("~cmd_vel_topic", "/mur620c/cmd_vel")
+        self.cmd_vel_topic = rospy.get_param("~cmd_vel_topic", "/mur620d/cmd_vel")
         self.joy_topic = rospy.get_param("~joy_topic", "/joy")
 
         self.publish_rate = rospy.get_param("~publish_rate", 50.0)   # Hz
