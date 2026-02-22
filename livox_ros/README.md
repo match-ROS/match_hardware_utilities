@@ -9,12 +9,38 @@
 
 - Ubuntu 22.04 for ROS2 Humble
 
-## Installation
+## Alternative: automated build
+The package provides a script that installs everything automatically for you. You first has to create a catkin workspace and place the _match_livox_ folder in __[your_workspace]/src/__. It should have this structure:
+```
+user/
+└── your_workspace/
+    └── src/
+        └── match_livox
+```
+Then run the script within the _match_livox_ package, passing your ROS version as argument to it (ROS1|ROS2|humble). For example, if your ROS version is ROS1:
+```
+./auto_build.sh ROS1
+```
+In case the permission to run the script is denied, run:
+```
+chmod +x auto_build.sh
+```
+When the build is finished, the installed packages should have the following structure:
+```
+user/
+├── Livox-SDK2
+└── your_workspace/
+    └── src/
+        ├── livox_ros_driver2
+        └── match_livox
+```
+
+## Alternative: Build from source
 
 1. Follow the instruction for installing [Livox-SDK2](https://github.com/Livox-SDK/Livox-SDK2).
 
 2. Follow the instruction for installing [Livox ROS Driver 2](https://github.com/Livox-SDK/livox_ros_driver2) . __Make sure to clone the repository in [your_workspace]/src/__.
-3. Copy the match_livox folder to the same directory as livox_ros_driver2. Then from the root of your workspace folder, run `catkin_make`.
+3. Copy the _match_livox_ folder to the same directory as _livox_ros_driver2_. Then from the root of your workspace folder, run `catkin_make`.
 
   
 ## Usage for match's mur620b robot
