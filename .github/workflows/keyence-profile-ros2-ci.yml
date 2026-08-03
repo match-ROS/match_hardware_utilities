@@ -1,0 +1,37 @@
+name: keyence-profile-ros2-ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  offline-build-and-test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: keyence_profile_ros2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: jazzy
+      - name: Install declared dependencies
+        run: |
+          rosdep update
+          rosdep install --from-paths . --ignore-src -r -y
+      - name: Static Python lint
+        run: |
+          python3 -m pip install ruff
+          ruff check --select=E9,F63,F7,F82 keyence_profile_ros2 test
+      - name: Build
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          colcon build --base-paths . --packages-select keyence_profile_ros2
+      - name: Run replay and fake-SDK tests
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          source install/setup.bash
+          colcon test --base-paths . --packages-select keyence_profile_ros2
+          colcon test-result --all --verbose
